@@ -2,20 +2,90 @@ package main
 
 import (
 	"block-go/blockchain"
+	"flag"
 	"fmt"
+	"os"
+	"runtime"
+	"strconv"
 )
 
-func main() {
-	chain := blockchain.InitBlockChain()
+type CommandLine struct {
+	blockchain *blockchain.BlockChain
+}
 
-	chain.AddBlock("first block after genesis")
-	chain.AddBlock("second block after genesis")
-	chain.AddBlock("third block after genesis")
+func (cli *CommandLine) printUsage() {
+	fmt.Println("Usage")
+	fmt.Println("add -block BLOCK_DATA -add a block to the chain")
+	fmt.Println("print -Prints the blocks in the chain")
+}
 
-	//to see all the blocks
-	for _, block := range chain.Blocks {
+func (cli *CommandLine) validateArgs() {
+	if len(os.Args) < 2 {
+		cli.printUsage()
+		runtime.Goexit()
+	}
+}
+
+func (cli *CommandLine) addBlock(data string) {
+	cli.blockchain.AddBlock(data)
+	fmt.Println("Added Blocks!")
+}
+
+func (cli *CommandLine) printChain() {
+	iter := cli.blockchain.Iterator()
+
+	for {
+		block := iter.Next()
 		fmt.Printf("Previous Hash: %x\n", block.PreHash)
 		fmt.Printf("Data in block: %s\n", block.Data)
 		fmt.Printf("Hash: %x\n", block.Hash)
+		pow := blockchain.NewProof(block)
+		fmt.Printf("PoW: %s\n", strconv.FormatBool(pow.Validate()))
+		fmt.Println()
+
+		if len(block.PreHash) == 0 {
+			break
+		}
 	}
+}
+
+func (cli *CommandLine) run() {
+	cli.validateArgs()
+
+	addBlockCmd := flag.NewFlagSet("add", flag.ExitOnError)
+	printBlockCmd := flag.NewFlagSet("print", flag.ExitOnError)
+	addBlockData := addBlockCmd.String("block", "", "Block data")
+
+	switch os.Args[1] {
+	case "add":
+		err := addBlockCmd.Parse(os.Args[2:])
+		blockchain.Handle(err)
+	case "print":
+		err := printBlockCmd.Parse(os.Args[2:])
+		blockchain.Handle(err)
+	default:
+		cli.printUsage()
+		runtime.Goexit()
+	}
+
+	if addBlockCmd.Parsed() {
+		if *addBlockData == "" {
+			addBlockCmd.Usage()
+			runtime.Goexit()
+		}
+		cli.addBlock(*addBlockData)
+	}
+	if printBlockCmd.Parsed() {
+		cli.printChain()
+	}
+
+}
+
+func main() {
+	defer os.Exit(0)
+	chain := blockchain.InitBlockChain()
+
+	defer chain.Database.Close()
+	cli := CommandLine{chain}
+	cli.run()
 }

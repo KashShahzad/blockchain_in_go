@@ -24,7 +24,8 @@ type ProofOfWork struct {
 
 func NewProof(b *Block) *ProofOfWork {
 	target := big.NewInt(1)
-	//subtract 256(number of bytes in a hash) with difficulity and use target value to left shift number of bytes
+	//subtract 256(number of bytes in a hash) with difficulity and use target value 
+	//to left shift number of bytes
 	target.Lsh(target, uint(256-Difficulty))
 
 	pow := &ProofOfWork{b, target}
@@ -58,6 +59,16 @@ func ToHex(num int64) []byte {
 	}
 	//returns the byte portion of our buffer from this tohax func
 	return buff.Bytes()
+}
+
+func (pow *ProofOfWork) Validate() bool {
+	var intHash big.Int
+	data := pow.InitData(pow.Block.Nonce)
+
+	hash := sha256.Sum256(data)
+	intHash.SetBytes(hash[:])
+
+	return intHash.Cmp(pow.Target) == -1
 }
 
 //check the hash to see if it meets a set of requirements
